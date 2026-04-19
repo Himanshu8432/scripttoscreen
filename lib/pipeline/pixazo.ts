@@ -12,6 +12,7 @@
 // because a stale env var silently breaks every clip with a 410 HTML page.
 
 import { selectPixazoModel, type PixazoModel, type PixazoVideoInput } from "./pixazo-models"
+import { getApiKeys } from "@/lib/api-config"
 
 const DEFAULT_BASE = "https://gateway.pixazo.ai"
 
@@ -28,10 +29,10 @@ function resolveBaseUrl(): string {
 }
 
 function authHeaders(): HeadersInit {
-  const key = process.env.PIXAZO_API_KEY
+  const { pixazoKey: key } = getApiKeys()
   if (!key) {
     throw new Error(
-      "PIXAZO_API_KEY is not set. Add it in Project Settings → Vars before running the pipeline.",
+      "Pixazo API key is not set. Please add it in the setup screen.",
     )
   }
   return {

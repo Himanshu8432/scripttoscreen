@@ -10,6 +10,7 @@ import { tmpdir } from "node:os"
 import { nanoid } from "nanoid"
 import type { Scene } from "@/lib/types"
 import { probeDuration, runFfmpeg } from "@/lib/ffmpeg"
+import { getApiKeys } from "@/lib/api-config"
 
 export interface VoiceoverResult {
   fullAudioPath: string // Local path to combined MP3
@@ -20,8 +21,8 @@ export interface VoiceoverResult {
 }
 
 export async function generateVoiceover(scenes: Scene[], voice = "alloy"): Promise<VoiceoverResult> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set.")
+  const { openaiKey: apiKey } = getApiKeys()
+  if (!apiKey) throw new Error("OpenAI API key is not set. Please add it in the setup screen.")
 
   const workDir = join(tmpdir(), `s2s-${nanoid(8)}`)
   await mkdir(workDir, { recursive: true })

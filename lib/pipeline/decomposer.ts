@@ -1,19 +1,14 @@
-// Stage 1: Decompose a script into 12-14s scenes via structured LLM output.
-// Uses AI SDK + AI Gateway (zero-config on Vercel). Returns an array of Scene
-// objects that every downstream stage depends on.
-
-import { generateText, Output } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { generateObject } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
 import { z } from "zod"
 import type { Scene, SceneMood } from "@/lib/types"
+import { getApiKeys } from "@/lib/api-config"
 
 const SceneSchema = z.object({
   text: z.string().min(1),
   visual: z.string().min(1),
-  duration: z.number().min(5).max(12),
-  mood: z
-    .enum(["calm", "tense", "upbeat", "mysterious", "dramatic", "reflective", "energetic", "somber"])
-    .describe("Overall mood of this scene"),
+  duration: z.number().min(5).max(10),
+  mood: z.enum(["calm", "tense", "upbeat", "mysterious", "dramatic", "reflective", "energetic", "somber"]),
 })
 
 const OutputSchema = z.object({
@@ -34,15 +29,18 @@ Rules:
 7. Preserve the script's flow. The concatenation of all "text" fields MUST equal the original script (minus trivial whitespace).`
 
 export async function decomposeScript(script: string): Promise<Scene[]> {
-  const { experimental_output } = await generateText({
+  const { openaiKey } = getApiKeys()
+  if (!openaiKey) throw new Error("OpenAI API key is not set. Please add it in the setup screen.")
+
+  const openai = createOpenAI({ apiKey: openaiKey })
+  const { object } = await generateObject({
     model: openai("gpt-4o-mini"),
     system: SYSTEM,
     prompt: `Script:\n\n${script}`,
-    experimental_output: Output.object({ schema: OutputSchema }),
+    schema: OutputSchema,
   })
 
-  const parsed = experimental_output
-  return parsed.scenes.map((s, i) => ({
+  return object.scenes.map((s, i) => ({
     index: i,
     text: s.text.trim(),
     visual: s.visual.trim(),

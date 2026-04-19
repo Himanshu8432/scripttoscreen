@@ -8,6 +8,7 @@
 
 import { put } from "@vercel/blob"
 import { nanoid } from "nanoid"
+import { getApiKeys } from "@/lib/api-config"
 
 const ENDPOINT = "https://api.openai.com/v1/images/generations"
 
@@ -38,8 +39,8 @@ function sizeForAspect(
 }
 
 async function callOpenAI(model: string, prompt: string, size: string) {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set.")
+  const { openaiKey: apiKey } = getApiKeys()
+  if (!apiKey) throw new Error("OpenAI API key is not set. Please add it in the setup screen.")
 
   const body: Record<string, unknown> = {
     model,
@@ -105,9 +106,11 @@ export async function generateReferenceImage(
     bytes = await callOpenAI(fallbackModel, input.prompt, fallbackSize)
   }
 
+  const { blobToken } = getApiKeys()
   const blob = await put(`s2s/${nanoid(8)}/character.png`, bytes, {
     access: "public",
     contentType: "image/png",
+    token: blobToken || undefined,
   })
   console.log(`[v0] openai-image: uploaded -> ${blob.url}`)
   return { imageUrl: blob.url }

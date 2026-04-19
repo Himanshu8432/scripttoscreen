@@ -6,6 +6,7 @@
 
 import { useCallback, useRef, useState } from "react"
 import type { CharacterLock, PipelineEvent, PipelineStageId, Scene } from "@/lib/types"
+import type { AppKeys } from "@/hooks/use-keys"
 
 export interface StageState {
   id: PipelineStageId
@@ -89,7 +90,7 @@ export function useScriptPipeline() {
     setState(initialState())
   }, [])
 
-  const run = useCallback(async (script: string, voice: string, aspectRatio: string) => {
+  const run = useCallback(async (script: string, voice: string, aspectRatio: string, keys?: AppKeys) => {
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
@@ -99,7 +100,13 @@ export function useScriptPipeline() {
     try {
       const res = await fetch("/api/pipeline", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(keys && {
+            "x-openai-key": keys.openaiKey,
+            "x-pixazo-key": keys.pixazoKey,
+          }),
+        },
         body: JSON.stringify({ script, voice, aspectRatio }),
         signal: controller.signal,
       })

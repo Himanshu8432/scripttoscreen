@@ -83,6 +83,10 @@ export async function generateClips(
             lastErr = err
             const msg = err instanceof Error ? err.message : String(err)
             console.warn(`[v0] clip ${scene.index} attempt ${attempt + 1} failed: ${msg}`)
+            // Auth errors (401/403) will never succeed on retry — fail fast.
+            if (msg.includes("401") || msg.includes("403") || msg.includes("invalid subscription key")) {
+              break
+            }
             if (attempt < maxRetries) {
               const backoff = 2000 * Math.pow(2, attempt)
               console.log(`[v0] clip ${scene.index} retrying in ${backoff}ms`)

@@ -11,12 +11,13 @@
 // If the currently-selected Pixazo model is text-to-video, we skip the image
 // gen entirely — the style/character lock lives in the prompt prefix instead.
 
-import { generateText, Output } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { generateObject } from "ai"
+import { createOpenAI } from "@ai-sdk/openai"
 import { z } from "zod"
 import type { CharacterLock, Scene } from "@/lib/types"
 import { generateReferenceImage } from "./openai-image"
 import { selectPixazoModel } from "./pixazo-models"
+import { getApiKeys } from "@/lib/api-config"
 
 const LockSchema = z.object({
   name: z.string().min(1).describe("Short name for the protagonist"),
@@ -53,12 +54,14 @@ export async function lockCharacter(
   opts: { aspectRatio?: "16:9" | "9:16" | "1:1" | string } = {},
 ): Promise<CharacterLock> {
   const sceneSummary = scenes.map((s, i) => `${i + 1}. [${s.mood}] ${s.visual}`).join("\n")
+  const { openaiKey } = getApiKeys()
+  const openai = createOpenAI({ apiKey: openaiKey })
 
-  const { experimental_output: lock } = await generateText({
+  const { object: lock } = await generateObject({
     model: openai("gpt-4o-mini"),
     system: SYSTEM,
     prompt: `Scenes:\n${sceneSummary}\n\nDesign the protagonist, the locked style prefix, and the portrait prompt.`,
-    experimental_output: Output.object({ schema: LockSchema }),
+    schema: LockSchema,
   })
 
   // Only generate a reference image when the selected Pixazo model needs one.

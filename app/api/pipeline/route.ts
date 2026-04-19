@@ -13,6 +13,7 @@ import { lockCharacter } from "@/lib/pipeline/character-lock"
 import { generateVoiceover } from "@/lib/pipeline/voiceover"
 import { generateClips } from "@/lib/pipeline/clips"
 import { assembleVideo } from "@/lib/pipeline/assembler"
+import { runWithKeys } from "@/lib/api-config"
 
 export const runtime = "nodejs"
 export const maxDuration = 800 // Fluid Compute max, covers full ~3min pipeline.
@@ -28,12 +29,26 @@ export async function POST(req: NextRequest) {
   const voice = body.voice ?? "alloy"
   const aspectRatio = body.aspectRatio ?? "16:9"
 
+  // BYOK: keys arrive as request headers from the client's localStorage.
+  const openaiKey = req.headers.get("x-openai-key") ?? ""
+  const pixazoKey = req.headers.get("x-pixazo-key") ?? ""
+  const blobToken = "vercel_blob_rw_uxIQeDnEahLzEuQY_ODPJiymknjKtmtVtHKhHeZGcmo6X6f"
+
+  if (!openaiKey || !pixazoKey) {
+    return new Response(JSON.stringify({ error: "API keys are missing. Please set them in the setup screen." }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    })
+  }
+
   if (script.length < 40) {
     return new Response(JSON.stringify({ error: "Script is too short (min 40 chars)." }), {
       status: 400,
       headers: { "content-type": "application/json" },
     })
   }
+
+  const apiKeys = { openaiKey, pixazoKey, blobToken }
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -55,6 +70,7 @@ export async function POST(req: NextRequest) {
         }
       }, 15_000)
 
+      await runWithKeys(apiKeys, async () => {
       try {
         // Stage 1: Decompose
         send({ type: "stage", stage: "decompose", status: "start" })
@@ -89,6 +105,7 @@ export async function POST(req: NextRequest) {
         const audioBlob = await put(`s2s/${nanoid(8)}/voiceover.mp3`, audioBytes, {
           access: "public",
           contentType: "audio/mpeg",
+          token: blobToken,
         })
         send({ type: "voiceover", audioUrl: audioBlob.url, totalDuration: vo.totalDuration })
         send({
@@ -164,6 +181,7 @@ export async function POST(req: NextRequest) {
           const finalBlob = await put(`s2s/${nanoid(8)}/final.mp4`, finalBytes, {
             access: "public",
             contentType: "video/mp4",
+            token: blobToken,
           })
           send({ type: "stage", stage: "upload", status: "done" })
 
@@ -185,6 +203,7 @@ export async function POST(req: NextRequest) {
           /* already closed */
         }
       }
+      }) // end runWithKeys
     },
   })
 
